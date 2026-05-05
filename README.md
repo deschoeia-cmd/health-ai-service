@@ -85,6 +85,29 @@ Returns whether the service is running.
 }
 ```
 
+## Input Validation
+
+Before any classification is performed, incoming text is validated using a Pydantic field validator. Requests that do not meet the following criteria are rejected with a `422 Unprocessable Entity` response:
+
+| Rule | Requirement |
+|------|-------------|
+| Not empty | Text must not be blank or whitespace-only |
+| Minimum length | Text must be at least 10 characters |
+| Maximum length | Text must not exceed 500 characters |
+
+**Example rejection response (input too short):**
+```json
+{
+  "detail": [
+    {
+      "type": "value_error",
+      "msg": "Value error, Text is too short to analyze.",
+      "input": "ow"
+    }
+  ]
+}
+```
+
 
 ### `POST /analyze`
 
@@ -107,7 +130,6 @@ Receives a short health-related text and returns an AI-assisted classification.
 ```
 The confidence value represents the cosine similarity between the input text and the closest **category prototype** (the mean embedding of all reference sentences for that category).
 
----
 
 ## Running with Docker
 ### Build the Docker image
@@ -145,5 +167,21 @@ curl -X POST http://localhost:8000/analyze \
   -d '{"text": "I have chest pain and shortness of breath."}'
 
 ```
+---
+## Using the Interactive API Docs
+
+FastAPI automatically generates an interactive UI for the API. Once the service is running, open your browser and go to:
+
+```text
+http://localhost:8000/docs
+```
+
+From there:
+
+1. Click on the endpoint you want to try (`GET /health` or `POST /analyze`).
+2. Click **"Try it out"** in the top right of the endpoint panel.
+3. For `/analyze`, replace the example value in the `text` field with your own input.
+4. Click **"Execute"** to send the request.
+5. The response will appear below, showing the `label` and `confidence`.
 
 ---

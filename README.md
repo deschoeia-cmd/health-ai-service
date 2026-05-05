@@ -23,7 +23,6 @@ The classification is based on **semantic similarity** between the user input an
 ## Model Used
 
 - **Model**: `sentence-transformers/all-MiniLM-L6-v2`
-- **Source**: Hugging Face
 - **Type**: Transformer-based sentence embedding model
 - **Properties**:
   - Lightweight

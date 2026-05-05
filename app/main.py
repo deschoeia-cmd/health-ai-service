@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from pydantic import BaseModel, field_validator
 from sentence_transformers import SentenceTransformer, util
+import torch
 
 app = FastAPI(title="Health AI Service")
 
@@ -60,15 +61,12 @@ CATEGORY_EXAMPLES = {
     ]
 }
 
-# Pre-compute embeddings for category examples once at startup
-example_texts = []
-example_labels = []
+# Pre-compute per-category prototype embeddings at startup (mean of all examples)
+category_prototypes: dict[str, torch.Tensor] = {}
 for label, texts in CATEGORY_EXAMPLES.items():
-    for t in texts:
-        example_texts.append(t)
-        example_labels.append(label)
+    embeddings = model.encode(texts, convert_to_tensor=True)  # (N, D)
+    category_prototypes[label] = embeddings.mean(dim=0)       # (D,) prototype vector
 
-example_embeddings = model.encode(example_texts, convert_to_tensor=True)
 
 class AnalyzeRequest(BaseModel):
     text: str
@@ -82,7 +80,7 @@ class AnalyzeRequest(BaseModel):
         if len(v.strip()) < 10:
             raise ValueError("Text is too short to analyze.")
         if len(v) > 500:
-            raise ValueError("Text is too long (max 1000 characters).")
+            raise ValueError("Text is too long (max 500 characters).")
         return v.strip()
 
 @app.get("/health")
@@ -92,15 +90,16 @@ def health():
 
 @app.post("/analyze")
 def analyze(req: AnalyzeRequest):
-    # 3) Embed user input
+    # Embed user input
     input_embedding = model.encode(req.text, convert_to_tensor=True)
 
-    # 4) Compare using cosine similarity against all example phrases
-    similarities = util.cos_sim(input_embedding, example_embeddings)[0]
+    # Compare against each category prototype using cosine similarity
+    scores = {
+        label: float(util.cos_sim(input_embedding, proto).item())
+        for label, proto in category_prototypes.items()
+    }
 
-    # 5) Find best match
-    best_idx = int(similarities.argmax())
-    best_label = example_labels[best_idx]
-    best_conf = float(similarities[best_idx].item())
+    best_label = max(scores, key=scores.__getitem__)
+    best_conf = scores[best_label]
 
     return {"label": best_label, "confidence": round(best_conf, 2)}

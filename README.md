@@ -35,20 +35,16 @@ The model is downloaded once at container startup and cached locally.
 ---
 
 ## Classification Approach
-
-The classification logic follows the suggested approach from the challenge:
-
+The classification logic works as follows:
 1. Define a small set of example sentences per category.
 2. Load a sentence embedding model at startup.
-3. Pre-compute embeddings for all reference example sentences.
+3. Pre-compute embeddings for all reference example sentences and average them into a single **prototype vector per category**.
 4. Embed the incoming user text.
-5. Compute cosine similarity between the input embedding and all example embeddings.
-6. Select the label of the most similar example sentence.
+5. Compute cosine similarity between the input embedding and each **category prototype** (the mean of all reference embeddings per category).
+6. Select the label of the **most similar category prototype**.
 7. Return:
    - the predicted `label`
-   - a similarity-based `confidence` score (cosine similarity)
-
-This keeps the service simple, transparent, and easy to extend.
+   - a similarity-based `confidence` score (cosine similarity between the input and the winning category prototype)
 
 ---
 
@@ -109,7 +105,7 @@ Receives a short health-related text and returns an AI-assisted classification.
   "confidence": 0.74
 }
 ```
-The confidence value represents the cosine similarity between the input text and the closest reference example.
+The confidence value represents the cosine similarity between the input text and the closest **category prototype** (the mean embedding of all reference sentences for that category).
 
 ---
 

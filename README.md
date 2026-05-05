@@ -180,7 +180,7 @@ From there:
 
 1. Click on the endpoint you want to try (`GET /health` or `POST /analyze`).
 2. Click **"Try it out"** in the top right of the endpoint panel.
-3. For `/analyze`, replace the example value in the `text` field with your own input.
+3. For `/analyze`, replace the example value in the `text` ("string") field with your own input.
 4. Click **"Execute"** to send the request.
 5. The response will appear below, showing the `label` and `confidence`.
 

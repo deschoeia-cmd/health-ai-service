@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from sentence_transformers import SentenceTransformer, util
 
 app = FastAPI(title="Health AI Service")
@@ -38,6 +38,18 @@ example_embeddings = model.encode(example_texts, convert_to_tensor=True)
 
 class AnalyzeRequest(BaseModel):
     text: str
+
+# Check if input id valid
+    @field_validator("text")
+    @classmethod
+    def text_must_not_be_empty(cls, v):
+        if not v or not v.strip():
+            raise ValueError("Text must not be empty.")
+        if len(v.strip()) < 10:
+            raise ValueError("Text is too short to analyze.")
+        if len(v) > 200:
+            raise ValueError("Text is too long (max 1000 characters).")
+        return v.strip()
 
 @app.get("/health")
 def health():

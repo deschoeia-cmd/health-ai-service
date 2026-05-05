@@ -71,7 +71,7 @@ for label, texts in CATEGORY_EXAMPLES.items():
 class AnalyzeRequest(BaseModel):
     text: str
 
-# Check if input id valid
+# Check if input is valid
     @field_validator("text")
     @classmethod
     def text_must_not_be_empty(cls, v):

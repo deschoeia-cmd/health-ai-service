@@ -18,9 +18,7 @@ It accepts a short health check-in text and classifies it into one of the follow
 
 The classification is based on **semantic similarity** between the user input and a small set of reference example sentences.
 
----
-
-## Model Used
+### Model Used
 
 - **Model**: `sentence-transformers/all-MiniLM-L6-v2`
 - **Source**: Sentence-Transformers
@@ -32,8 +30,7 @@ The classification is based on **semantic similarity** between the user input an
 
 The model is downloaded once at container startup and cached locally.
 
----
-## Input Validation
+### Input Validation
 
 Before any classification is performed, incoming text is validated using a Pydantic field validator. Requests that do not meet the following criteria are rejected with a `422 Unprocessable Entity` response:
 
@@ -56,7 +53,7 @@ Before any classification is performed, incoming text is validated using a Pydan
 }
 ```
 
-## Classification Approach
+### Classification Approach
 The classification logic works as follows:
 1. Define a small set of example sentences per category.
 2. Load a sentence embedding model at startup.
@@ -67,7 +64,7 @@ The classification logic works as follows:
 7. Return:
    - the predicted `label`
 
-## Calculation of Confidence
+### Calculation of Confidence
 The calculation of the "confidence" is as follows:
 1. After computing cosine similarities between the input and all reference sentences, the top-5 most similar examples are selected.
 2. For each of the top-k examples (default k=5), its cosine similarity score is added to the running total of its corresponding label.
@@ -137,7 +134,7 @@ Receives a short health-related text and returns an AI-assisted classification.
 ```
 The confidence value represents the cosine similarity between the input text and the closest **category prototype** (weighted k-NN voting).
 
-
+---
 ## Running with Docker
 ### Build the Docker image
 ```text
@@ -199,5 +196,74 @@ Click on the endpoint you want to try (`GET /health` or `POST /analyze`).
 4. Replace the example value in the `text` ("string") field with your own input
 5. Click **"Execute"** to send the request.
 6. The response will appear below, showing the `label` and `confidence`.
+
+---
+## Known Limitation: Negation Handling
+### The Problem
+The classifier uses cosine similarity with weighted k-NN voting over sentence embeddings (all-MiniLM-L6-v2). A limitation is that negated symptom descriptions are not always classified correctly.
+### For example (top-k=5):
+
+**Request body**
+```json
+{
+  "text": "I don't have chest pain."
+}
+```
+
+**Response**
+```json
+
+{
+  "label": "urgent_review",
+  "confidence": 0.54
+}
+```
+
+This happens because the embedding model is trained on semantic similarity rather than logical meaning, causing negated and non-negated versions of the same symptom to land close together in vector space. With k=5, the majority vote gets pulled toward urgent_review simply because chest pain examples dominate that category.
+
+### Edge Cases to Be Aware Of
+Not all negation is equal. There is an important distinction between:
+
+| Sentence | Negation Type | Correct Class |
+|---|---|---|
+| *"I don't have chest pain"* | Negates the symptom → benign | `low_concern` |
+| *"I cannot stay conscious"* | Negates the ability → dangerous | `urgent_review` |
+| *"I can't breathe"* | Negates the ability → dangerous | `urgent_review` |
+| *"I have no fever"* | Negates the symptom → benign | `low_concern` |
+
+A naive negation rule would incorrectly downgrade "I cannot stay conscious" because it detects the word "not" inside "cannot".
+
+### Possible Solutions
+
+**1. Expand the Example Set**
+
+Add explicit negation examples to the categories, such as:
+`low_concern` 
+- *"I don't have chest pain"*
+- *"I have no shortness of breath"*
+- *"I am not experiencing any dizziness"*
+`urgent_review`
+- *"I can't breath"*
+- *"My legs don't work anymore"*
+- *"I cannot see since two days"*
+
+This pulls kNN voting in the right direction without changing the architecture.
+
+
+**2. Rule-Based Negation Guard**
+
+Distinguish between **symptom negation** and **ability negation**:
+- `no / don't have / do not have` → likely benign, consider downgrading
+- `can't / cannot / unable to` → still urgent, do not downgrade
+
+This is recommended as an **immediate safeguard** in a safety-critical context. However there will always be edge cases to consider.
+
+
+**3. Switch to a Medical-Domain Model**
+
+Replace `all-MiniLM-L6-v2` with a model trained on clinical text, where the distinction
+between *"chest pain"* and *"no chest pain"* is explicitly meaningful:
+- [`pritamdeka/S-PubMedBert-MS-MARCO`](https://huggingface.co/pritamdeka/S-PubMedBert-MS-MARCO)
+- [`microsoft/BiomedNLP-BiomedBERT-base-uncased`](https://huggingface.co/microsoft/BiomedNLP-BiomedBERT-base-uncased)
 
 ---

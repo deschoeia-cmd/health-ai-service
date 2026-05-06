@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from pydantic import BaseModel, field_validator
 from sentence_transformers import SentenceTransformer, util
-import torch
+from collections import defaultdict
 
 app = FastAPI(title="Health AI Service")
 
@@ -9,7 +9,7 @@ app = FastAPI(title="Health AI Service")
 model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")  # [2](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2)
 
 # 2) Reference examples per category
-    # More linguistic variety → improves embedding separation
+    # More linguistic variety (including negative sentences e.g., "I don't feel good") → improves embedding separation
     # Includes time dimension (“for days”, “not improving”)
     # Captures uncertainty language (“something feels off”)
     # Includes borderline cases → helps classification boundaries
@@ -18,6 +18,8 @@ CATEGORY_EXAMPLES = {
     "low_concern": [
         # clearly benign / everyday
         "I feel fine overall.",
+        "I don't feel chest pain"
+        "I don't have any pain for some time now"
         "Just a mild headache, nothing serious.",
         "I have a slight cold but I'm okay.",
         "I feel a bit tired after work.",
@@ -42,6 +44,7 @@ CATEGORY_EXAMPLES = {
         "I feel more short of breath than usual when walking.",
         "Something feels off but I cannot explain it.",
         "I am worried because my symptoms are lasting longer than expected."
+        "I don't feel good for a month now"
     ],
 
     "urgent_review": [
@@ -61,12 +64,15 @@ CATEGORY_EXAMPLES = {
     ]
 }
 
-# Pre-compute per-category prototype embeddings at startup (mean of all examples)
-category_prototypes: dict[str, torch.Tensor] = {}
+# Pre-compute embeddings for category examples once at startup
+example_texts = []
+example_labels = []
 for label, texts in CATEGORY_EXAMPLES.items():
-    embeddings = model.encode(texts, convert_to_tensor=True)  # (N, D)
-    category_prototypes[label] = embeddings.mean(dim=0)       # (D,) prototype vector
+    for t in texts:
+        example_texts.append(t)
+        example_labels.append(label)
 
+example_embeddings = model.encode(example_texts, convert_to_tensor=True)
 
 class AnalyzeRequest(BaseModel):
     text: str
@@ -79,27 +85,35 @@ class AnalyzeRequest(BaseModel):
             raise ValueError("Text must not be empty.")
         if len(v.strip()) < 10:
             raise ValueError("Text is too short to analyze.")
-        if len(v) > 500:
-            raise ValueError("Text is too long (max 500 characters).")
+        if len(v) > 1000:
+            #  input text longer than 256 word pieces is truncated (corresponding to approx. 1000 characters)
+            raise ValueError("Text is too long (max 1000 characters).")
         return v.strip()
-
 @app.get("/health")
 def health():
-    # Required by the task: returns whether the service is running [1](https://indema-my.sharepoint.com/personal/iara_deschoenmacker_indema_ch/Documents/Microsoft%20Copilot%20Chat-Dateien/Lightweight_AI_REST_Service_Challenge.pdf)
+    # Return whether the service is running
     return {"status": "ok"}
 
 @app.post("/analyze")
-def analyze(req: AnalyzeRequest):
-    # Embed user input
+def analyze(req: AnalyzeRequest, top_k: int = 5):
+    # 1) Embed user input
     input_embedding = model.encode(req.text, convert_to_tensor=True)
 
-    # Compare against each category prototype using cosine similarity
-    scores = {
-        label: float(util.cos_sim(input_embedding, proto).item())
-        for label, proto in category_prototypes.items()
-    }
+    # 2) Compare using cosine similarity against all example phrases
+    similarities = util.cos_sim(input_embedding, example_embeddings)[0]
 
-    best_label = max(scores, key=scores.__getitem__)
-    best_conf = scores[best_label]
+    # 3) Get top-k most similar examples
+    top_k_result = similarities.topk(top_k)
 
-    return {"label": best_label, "confidence": round(best_conf, 2)}
+    # 4) Sum cosine similarities per label (weighted k-NN)
+    label_scores = defaultdict(float)
+    for idx, score in zip(top_k_result.indices, top_k_result.values):
+        label = example_labels[int(idx)]
+        label_scores[label] += float(score.item())
+
+    # 5) Winner = label with largest sum
+    total = sum(label_scores.values())
+    best_label = max(label_scores, key=label_scores.get)
+    confidence = round(label_scores[best_label] / total, 2)
+
+    return {"label": best_label, "confidence": confidence}

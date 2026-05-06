@@ -3,7 +3,55 @@ from pydantic import BaseModel, field_validator
 from sentence_transformers import SentenceTransformer, util
 from collections import defaultdict
 
-app = FastAPI(title="Health AI Service")
+app = FastAPI(
+    title="Health AI Service",
+    version="0.1.0",
+    description="""
+## Description
+
+A lightweight REST API that classifies short health-related text into one of three concern levels.
+
+> ⚠️ Prototype only — not a medical decision tool.
+---
+
+**How it works**
+
+Your input is embedded using `all-MiniLM-L6-v2` and matched against reference sentences via cosine similarity (weighted k-NN, default k=5).
+
+The confidence score (0–1) is the winning label's summed cosine similarities across the top-k matches, divided by the total summed similarities across all top-k matches.
+A confidence close to 1.0 means the top-k matches were dominated by a single label. A value close to 0.33 (for 3 labels) indicates an uncertain, evenly distributed result.
+---
+
+**Labels**
+ 
+| Label | Meaning |
+|---|---|
+| `low_concern` | Everyday symptoms, no red flags |
+| `needs_follow_up` | Persistent or worsening symptoms |
+| `urgent_review` | Acute red-flag symptoms |
+
+---
+
+**Getting started**
+
+**GET `/health`:**
+Returns whether the service is running.
+1. Click on the panel `GET /health`
+2. Click **"Try it out"** in the top right of the endpoint panel.
+3. Click **"Execute"** to send the request.
+4. The response will appear below, showing `"status": "ok"`.
+
+**POST `/analyze`:**
+Receives a short health-related text and returns an AI-assisted classification.
+1. Click on the panel `POST /analyze`
+2. Click **"Try it out"** in the top right of the endpoint panel.
+3. Choose the numbre of top-k for the weighted k-NN voting (default is k=5).
+4. Replace the example value in the `text` ("string") field with your own input (10-1000 characters).
+5. Click **"Execute"** to send the request.
+6. The response will appear below, showing the `label` and `confidence`.
+
+""",
+)
 
 # 1) Load a lightweight local model (downloaded once, then cached locally)
 model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")  # [2](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2)

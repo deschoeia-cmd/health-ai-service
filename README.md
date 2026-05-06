@@ -38,13 +38,22 @@ The model is downloaded once at container startup and cached locally.
 The classification logic works as follows:
 1. Define a small set of example sentences per category.
 2. Load a sentence embedding model at startup.
-3. Pre-compute embeddings for all reference example sentences and average them into a single **prototype vector per category**.
+3. Pre-compute embeddings for all reference example sentences.
 4. Embed the incoming user text.
-5. Compute cosine similarity between the input embedding and each **category prototype** (the mean of all reference embeddings per category).
-6. Select the label of the **most similar category prototype**.
+5. Compute cosine similarity between the input embedding and all reference example sentences.
+6. Select the top-5 most similar reference sentences and apply **weighted k-NN voting** to determine the predicted label.
 7. Return:
    - the predicted `label`
-   - a similarity-based `confidence` score (cosine similarity between the input and the winning category prototype)
+
+## Calculation of Confidence
+The calculation of the "confidence" is as follows:
+1. After computing cosine similarities between the input and all reference sentences, the top-5 most similar examples are selected.
+2. For each of the top-5 examples, its cosine similarity score is added to the running total of its corresponding label.
+3. The label with the highest accumulated similarity score is the predicted label (weighted k-NN voting).
+4. Confidence is calculated as the fraction of the winning label's score over the total accumulated score across all top-5 examples.
+5. A confidence close to 1.0 means the top-5 matches were dominated by a single label. A value close to 0.33 (for 3 labels) indicates an uncertain, evenly distributed result.
+Return:
+   - `confidence` score between 0 and 1.
 
 ---
 

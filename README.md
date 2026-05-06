@@ -69,7 +69,12 @@ The calculation of the "confidence" is as follows:
 1. After computing cosine similarities between the input and all reference sentences, the top-5 most similar examples are selected.
 2. For each of the top-k examples (default k=5), its cosine similarity score is added to the running total of its corresponding label.
 3. The label with the highest accumulated similarity score is the predicted label (weighted k-NN voting).
-4. Confidence is calculated as the fraction of the winning label's score over the total accumulated score across all top-k examples.
+4. The confidence score (0–1) is the winning label's summed cosine similarities across the top-k matches, divided by the total summed similarities across all top-k matches.
+
+$$
+\text{confidence} = \frac{\sum_{x_i \in \text{top-k, winning label}} \text{cos-sim}(\text{input}, x_i)}{\sum_{x_i \in \text{top-k}} \text{cos-sim}(\text{input}, x_i)}
+$$
+                      
 5. A confidence close to 1.0 means the top-k matches were dominated by a single label. A value close to 0.33 (for 3 labels) indicates an uncertain, evenly distributed result.
 6. Return:
    - `confidence` score between 0 and 1.

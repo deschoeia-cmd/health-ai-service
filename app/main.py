@@ -23,7 +23,7 @@ A confidence close to 1.0 means the top-k matches were dominated by a single lab
 ---
 
 **Labels**
-
+ 
 | Label | Meaning |
 |---|---|
 | `low_concern` | Everyday symptoms, no red flags |

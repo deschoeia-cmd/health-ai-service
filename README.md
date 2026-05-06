@@ -33,6 +33,28 @@ The classification is based on **semantic similarity** between the user input an
 The model is downloaded once at container startup and cached locally.
 
 ---
+## Input Validation
+
+Before any classification is performed, incoming text is validated using a Pydantic field validator. Requests that do not meet the following criteria are rejected with a `422 Unprocessable Entity` response:
+
+| Rule | Requirement |
+|------|-------------|
+| Not empty | Text must not be blank or whitespace-only |
+| Minimum length | Text must be at least 10 characters |
+| Maximum length | Text must not exceed 500 characters |
+
+**Example rejection response (input too short):**
+```json
+{
+  "detail": [
+    {
+      "type": "value_error",
+      "msg": "Value error, Text is too short to analyze.",
+      "input": "ow"
+    }
+  ]
+}
+```
 
 ## Classification Approach
 The classification logic works as follows:
@@ -93,30 +115,6 @@ Returns whether the service is running.
   "status": "ok"
 }
 ```
-
-## Input Validation
-
-Before any classification is performed, incoming text is validated using a Pydantic field validator. Requests that do not meet the following criteria are rejected with a `422 Unprocessable Entity` response:
-
-| Rule | Requirement |
-|------|-------------|
-| Not empty | Text must not be blank or whitespace-only |
-| Minimum length | Text must be at least 10 characters |
-| Maximum length | Text must not exceed 500 characters |
-
-**Example rejection response (input too short):**
-```json
-{
-  "detail": [
-    {
-      "type": "value_error",
-      "msg": "Value error, Text is too short to analyze.",
-      "input": "ow"
-    }
-  ]
-}
-```
-
 
 ### `POST /analyze`
 

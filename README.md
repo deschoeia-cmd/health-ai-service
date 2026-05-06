@@ -63,18 +63,18 @@ The classification logic works as follows:
 3. Pre-compute embeddings for all reference example sentences.
 4. Embed the incoming user text.
 5. Compute cosine similarity between the input embedding and all reference example sentences.
-6. Select the top-5 most similar reference sentences and apply **weighted k-NN voting** to determine the predicted label.
+6. Select the top-k most similar reference sentences and apply **weighted k-NN voting** to determine the predicted label (default k=5)
 7. Return:
    - the predicted `label`
 
 ## Calculation of Confidence
 The calculation of the "confidence" is as follows:
 1. After computing cosine similarities between the input and all reference sentences, the top-5 most similar examples are selected.
-2. For each of the top-5 examples, its cosine similarity score is added to the running total of its corresponding label.
+2. For each of the top-k examples (default k=5), its cosine similarity score is added to the running total of its corresponding label.
 3. The label with the highest accumulated similarity score is the predicted label (weighted k-NN voting).
-4. Confidence is calculated as the fraction of the winning label's score over the total accumulated score across all top-5 examples.
-5. A confidence close to 1.0 means the top-5 matches were dominated by a single label. A value close to 0.33 (for 3 labels) indicates an uncertain, evenly distributed result.
-Return:
+4. Confidence is calculated as the fraction of the winning label's score over the total accumulated score across all top-k examples.
+5. A confidence close to 1.0 means the top-k matches were dominated by a single label. A value close to 0.33 (for 3 labels) indicates an uncertain, evenly distributed result.
+6. Return:
    - `confidence` score between 0 and 1.
 
 ---
@@ -132,10 +132,10 @@ Receives a short health-related text and returns an AI-assisted classification.
 
 {
   "label": "needs_follow_up",
-  "confidence": 0.74
+  "confidence": 0.65
 }
 ```
-The confidence value represents the cosine similarity between the input text and the closest **category prototype** (the mean embedding of all reference sentences for that category).
+The confidence value represents the cosine similarity between the input text and the closest **category prototype** (weighted k-NN voting).
 
 
 ## Running with Docker
@@ -184,11 +184,20 @@ http://localhost:8000/docs
 ```
 
 From there:
+Click on the endpoint you want to try (`GET /health` or `POST /analyze`).
 
-1. Click on the endpoint you want to try (`GET /health` or `POST /analyze`).
+**For `/analyze`:**
+1. Click on the panel `GET /health`
 2. Click **"Try it out"** in the top right of the endpoint panel.
-3. For `/analyze`, replace the example value in the `text` ("string") field with your own input.
-4. Click **"Execute"** to send the request.
-5. The response will appear below, showing the `label` and `confidence`.
+3. Click **"Execute"** to send the request.
+4. The response will appear below, showing `"status": "ok"`.
+
+**For `/health`:**
+1. Click on the panel `POST /analyze`
+2. Click **"Try it out"** in the top right of the endpoint panel.
+3. Choose the numbre of top-k for the weighted k-NN voting (default is k=5).
+4. Replace the example value in the `text` ("string") field with your own input
+5. Click **"Execute"** to send the request.
+6. The response will appear below, showing the `label` and `confidence`.
 
 ---

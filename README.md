@@ -41,7 +41,7 @@ Before any classification is performed, incoming text is validated using a Pydan
 |------|-------------|
 | Not empty | Text must not be blank or whitespace-only |
 | Minimum length | Text must be at least 10 characters |
-| Maximum length | Text must not exceed 500 characters |
+| Maximum length | Text must not exceed 1000 characters (corresponding to approx. 256 tokens) |
 
 **Example rejection response (input too short):**
 ```json

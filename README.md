@@ -183,13 +183,13 @@ http://localhost:8000/docs
 From there:
 Click on the endpoint you want to try (`GET /health` or `POST /analyze`).
 
-**For `/analyze`:**
+**For `/health`:**
 1. Click on the panel `GET /health`
 2. Click **"Try it out"** in the top right of the endpoint panel.
 3. Click **"Execute"** to send the request.
 4. The response will appear below, showing `"status": "ok"`.
 
-**For `/health`:**
+**For `/analyze`:**
 1. Click on the panel `POST /analyze`
 2. Click **"Try it out"** in the top right of the endpoint panel.
 3. Choose the numbre of top-k for the weighted k-NN voting (default is k=5).

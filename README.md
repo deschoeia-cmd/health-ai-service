@@ -60,25 +60,11 @@ The classification logic works as follows:
 3. Pre-compute embeddings for all reference example sentences.
 4. Embed the incoming user text.
 5. Compute cosine similarity between the input embedding and all reference example sentences.
-6. Select the top-k most similar reference sentences and apply **weighted k-NN voting** to determine the predicted label (default k=5)
-7. Return:
-   - the predicted `label`
-
-### Calculation of Confidence
-The calculation of the "confidence" is as follows:
-1. After computing cosine similarities between the input and all reference sentences, the top-5 most similar examples are selected.
-2. For each of the top-k examples (default k=5), its cosine similarity score is added to the running total of its corresponding label.
-3. The label with the highest accumulated similarity score is the predicted label (weighted k-NN voting).
-4. The confidence score (0–1) is the winning label's summed cosine similarities across the top-k matches, divided by the total summed similarities across all top-k matches.
-
-$$
-\text{confidence} = \frac{\sum_{x_i \in \text{top-k, winning label}} \text{cos-sim}(\text{input}, x_i)}{\sum_{x_i \in \text{top-k}} \text{cos-sim}(\text{input}, x_i)}
-$$
-                      
-5. A confidence close to 1.0 means the top-k matches were dominated by a single label. A value close to 0.33 (for 3 labels) indicates an uncertain, evenly distributed result.
-6. Return:
-   - `confidence` score between 0 and 1.
-
+6. Select most similar reference sentence to determine the predicted label.
+7. Normalize cosine similarity of the  most similar reference sentence via softmax (temperature=`0.05`) into a probability distribution; the highest probability is returned as the confidence score.
+8. Return:
+   - the predicted `label` and `confidence`
+  > ⚠️ The temperature value has not been fully optimized and may need further tuning for best results.
 ---
 
 ## Project Structure
@@ -134,10 +120,10 @@ Receives a short health-related text and returns an AI-assisted classification.
 
 {
   "label": "needs_follow_up",
-  "confidence": 0.65
+  "confidence": 0.98
 }
 ```
-The confidence value represents the cosine similarity between the input text and the closest **category prototype** (weighted k-NN voting).
+The confidence value represents the cosine similarity between the input text and the closest category prototype, normalized via softmax (temperature=`0.05`) into a probability distribution.
 
 ---
 ## Running with Docker
@@ -197,21 +183,20 @@ Click on the endpoint you want to try (`GET /health` or `POST /analyze`).
 **For `/analyze`:**
 1. Click on the panel `POST /analyze`
 2. Click **"Try it out"** in the top right of the endpoint panel.
-3. Choose the numbre of top-k for the weighted k-NN voting (default is k=5).
-4. Replace the example value in the `text` ("string") field with your own input
-5. Click **"Execute"** to send the request.
-6. The response will appear below, showing the `label` and `confidence`.
+3. Replace the example value in the `text` ("string") field with your own input
+4. Click **"Execute"** to send the request.
+5. The response will appear below, showing the `label` and `confidence`.
 
 ---
 ## Known Limitation: Negation Handling
 ### The Problem
-The classifier uses cosine similarity with weighted k-NN voting over sentence embeddings (all-MiniLM-L6-v2). A limitation is that negated symptom descriptions are not always classified correctly.
-### For example (top-k=5):
+The classifier uses cosine similarity over reference sentence embeddings (all-MiniLM-L6-v2). A limitation is that negated symptom descriptions are not always classified correctly.
+### For example:
 
 **Request body**
 ```json
 {
-  "text": "I don't have chest pain."
+  "text": "I don't have high blood pressure."
 }
 ```
 
@@ -220,11 +205,11 @@ The classifier uses cosine similarity with weighted k-NN voting over sentence em
 
 {
   "label": "urgent_review",
-  "confidence": 0.54
+  "confidence": 0.14
 }
 ```
 
-This happens because the embedding model is trained on semantic similarity rather than logical meaning, causing negated and non-negated versions of the same symptom to land close together in vector space. With k=5, the majority vote gets pulled toward urgent_review simply because chest pain examples dominate that category.
+This happens because the embedding model is trained on semantic similarity rather than logical meaning, causing negated and non-negated versions of the same symptom to land close together in vector space.
 
 ### Edge Cases to Be Aware Of
 Not all negation is equal. There is an important distinction between:
@@ -249,10 +234,10 @@ Add explicit negation examples to the categories, such as:
 - *"I am not experiencing any dizziness"*
 `urgent_review`
 - *"I can't breath"*
-- *"My legs don't work anymore"*
+- *"My legs don't work as they used to before"* (to quote Ed Sheeran ;))
 - *"I cannot see since two days"*
 
-This pulls kNN voting in the right direction without changing the architecture.
+This pulls the model in the right direction without changing the architecture.
 
 
 **2. Rule-Based Negation Guard**

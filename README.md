@@ -82,7 +82,7 @@ The classification logic works as follows:
 ## Requirements
 Before running the service, make sure you have the following installed:
 
-### Docker (required)
+### Docker
 Docker is used to build and run the application in a container.
 - Install Docker from the official website: https://www.docker.com/get-started  
 - After installation, verify it works:

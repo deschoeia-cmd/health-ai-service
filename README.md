@@ -228,11 +228,15 @@ A naive negation rule would incorrectly downgrade "I cannot stay conscious" beca
 **1. Expand the Example Set**
 
 Add explicit negation examples to the categories, such as:
+
 `low_concern` 
+
 - *"I don't have chest pain"*
 - *"I have no shortness of breath"*
 - *"I am not experiencing any dizziness"*
+
 `urgent_review`
+
 - *"I can't breath"*
 - *"My legs don't work as they used to before"* (to quote Ed Sheeran ;))
 - *"I cannot see since two days"*

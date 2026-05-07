@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from pydantic import BaseModel, field_validator
 from sentence_transformers import SentenceTransformer, util
-from collections import defaultdict
+import torch.nn.functional as F
 
 app = FastAPI(
     title="Health AI Service",
@@ -16,14 +16,12 @@ A lightweight REST API that classifies short health-related text into one of thr
 
 **How it works**
 
-Your input is embedded using `all-MiniLM-L6-v2` and matched against reference sentences via cosine similarity (weighted k-NN, default k=5).
-
-The confidence score (0–1) is the winning label's summed cosine similarities across the top-k matches, divided by the total summed similarities across all top-k matches.
-A confidence close to 1.0 means the top-k matches were dominated by a single label. A value close to 0.33 (for 3 labels) indicates an uncertain, evenly distributed result.
+Your input is embedded using `all-MiniLM-L6-v2` and matched against reference sentences via cosine similarity.
+Cosine similarity scores across all labels are normalized using softmax (temperature=0.05), producing a probability distribution that sums to 1. The label with the highest probability is returned as the result, and its probability is reported as the **confidence score**.
 ---
 
 **Labels**
- 
+
 | Label | Meaning |
 |---|---|
 | `low_concern` | Everyday symptoms, no red flags |
@@ -45,10 +43,9 @@ Returns whether the service is running.
 Receives a short health-related text and returns an AI-assisted classification.
 1. Click on the panel `POST /analyze`
 2. Click **"Try it out"** in the top right of the endpoint panel.
-3. Choose the numbre of top-k for the weighted k-NN voting (default is k=5).
-4. Replace the example value in the `text` ("string") field with your own input (10-1000 characters).
-5. Click **"Execute"** to send the request.
-6. The response will appear below, showing the `label` and `confidence`.
+3. Replace the example value in the `text` ("string") field with your own input (10-1000 characters).
+4. Click **"Execute"** to send the request.
+5. The response will appear below, showing the `label` and `confidence`.
 
 """,
 )
@@ -143,25 +140,16 @@ def health():
     return {"status": "ok"}
 
 @app.post("/analyze")
-def analyze(req: AnalyzeRequest, top_k: int = 5):
-    # 1) Embed user input
+def analyze(req: AnalyzeRequest):
     input_embedding = model.encode(req.text, convert_to_tensor=True)
-
-    # 2) Compare using cosine similarity against all example phrases
     similarities = util.cos_sim(input_embedding, example_embeddings)[0]
 
-    # 3) Get top-k most similar examples
-    top_k_result = similarities.topk(top_k)
+    # Apply softmax to normalize scores into a probability distribution
+    temperature = 0.05
+    probabilities = F.softmax(similarities / temperature, dim=0)
 
-    # 4) Sum cosine similarities per label (weighted k-NN)
-    label_scores = defaultdict(float)
-    for idx, score in zip(top_k_result.indices, top_k_result.values):
-        label = example_labels[int(idx)]
-        label_scores[label] += float(score.item())
+    best_idx = int(probabilities.argmax())
+    best_label = example_labels[best_idx]
+    best_conf = float(probabilities[best_idx].item())
 
-    # 5) Winner = label with largest sum
-    total = sum(label_scores.values())
-    best_label = max(label_scores, key=label_scores.get)
-    confidence = round(label_scores[best_label] / total, 2)
-
-    return {"label": best_label, "confidence": confidence}
+    return {"label": best_label, "confidence": round(best_conf, 2)}
